@@ -36,7 +36,7 @@ Physics step dt = 0x0A3D = 0.04 s (guess: 25 Hz physics tick). Gravity 0x9CF5C =
 ## 3. Steering and lean
 - bike_UpdateSteeringTorque (@060384CC): input shaped by a cubic (fine control near center), scaled down with speed, clamped to +-0x1A, multiplied by 56.4 then 0.04.
 - car_UpdateHeadingAngle (@06032714): heading relative to the course clamped to +-0x33C (about +-73 deg). Self-centering: MulHigh(rec+0x110, 0x4B4F). Steer input decays 0x22 per tick when released.
-- car_UpdateLeanBalance (@06031F14): a spring-damper on lean displacement: spring 300.0, damping 0.51. Lean angle = -atan2(rec+0x124, 1.41) (the 1.41 is the effective lever height, guess). So the bike leans against the lateral displacement, and the lean angle turns the heading (steer comes through lean, not directly).
+- car_UpdateLeanBalance (@06031F14): a spring-damper on lean displacement: spring 300.0, damping 0.51. Lean angle = -atan2(rec+0x124, 1.41) (1.41 = DAT_0603208c = 0x168F5 = 1.40999, the constant second argument of Atan2; read as a lever-arm length, GUESS, see Resolved (final pass)). So the bike leans against the lateral displacement, and the lean angle turns the heading (steer comes through lean, not directly).
 - Counter-steer feel (guess): because input drives a spring-damper lean and lean drives heading, there is a short lag then a settled turn, and releasing returns by spring plus the self-centering term.
 - car_UpdateSteeringSkid (@06032450): slip = atan2(lateral, forward); above 0x400 (90 deg units: threshold is large, effectively only in real slides) it triggers skid sound by frame mask.
 
@@ -44,7 +44,7 @@ Physics step dt = 0x0A3D = 0.04 s (guess: 25 Hz physics tick). Gravity 0x9CF5C =
 - Two probes: front (rec+0x4C) and rear (rec+0x70) via track_FindPolygonUnderPoint + track_ComputeSurfaceInfo.
 - Airborne if the height offset above the surface > 1.5696 (0x191D0). Grounded byte rec+0x148, air counter rec+0x14C.
 - Pitch is eased toward the surface slope from the two probes (so the bike pitches over crests); while airborne gravity 9.81 integrates vertical speed.
-- Slopes: gravity component along the surface adds/subtracts from speed (guess; the chain includes a pitch term in the force).
+- Slopes: car_ComputeFixedPolynomial adds slot-mass-weighted terms from three stack-passed components; the exact pitch/gravity split is still GUESS (see Resolved (final pass)).
 
 ## 5. Grip / slide
 - No tire model per se; lateral velocity rec+0x110 is damped by self-centering (0x4B4F factor) and slip angle is only used for sound/effects. Slides are visual/audio, not a separate friction regime (guess).
@@ -57,7 +57,7 @@ Physics step dt = 0x0A3D = 0.04 s (guess: 25 Hz physics tick). Gravity 0x9CF5C =
 - Rider-rider: car_FindNearbyCars threshold 0x2B (proximity); response goes through the same substep path (guess).
 
 ## 8. Crashes / falls
-- State byte 3/4 = crash with a recovery counter; car_UpdateFallState (@060321BC) damps with 0.98 per tick in states 3/4, otherwise 0.91. Crash sound when speed*0.62137*90 (high part) > 5. State 2 is normal driving with an after-effect (damp 0.98). Recovery duration: counter value not decoded (guess: about 1-2 s).
+- State byte 3/4 = crash with a recovery counter; car_UpdateFallState (@060321BC) damps with 0.98 per tick in states 3/4, otherwise 0.91. Crash sound when speed*0.62137*90 (high part) > 5. State 2 is normal driving with an after-effect (damp 0.98). Recovery duration: RESOLVED, counter rec+0x154 is set to 3 and the state returns to 1 after 3 physics ticks (about 0.12 s at dt 0.04); car_UpdateFallState branches on counter == 3, not on the state byte (see Resolved (final pass)).
 
 ## 9. Bike stats (table 0x0606F6D4, stride 0x20, 14 entries)
 +0 mass 237.0; +4 12.0; +8 Cd (0.502 / 0.3765); +0xC steer factor; +0x10 brake (500/618/481/437/600/562); +0x14 torque curve ptr 0x0603AF7C; +0x18 gear ratio table 0x0606F664; +0x1C efficiency table ptr (0x0606F680 / 0x0606F69C / 0x0606F6B8). Per-slot mass words at 0x0607910C.
@@ -92,3 +92,18 @@ Physics step dt = 0x0A3D = 0.04 s (guess: 25 Hz physics tick). Gravity 0x9CF5C =
 - math_ApplyDeadzoneOffset @060332AC -> math_WrapAngle12
 - menu_UpdateSelectionLevel @06037728 -> bike_UpdateGear
 - several table_* helpers used as small math/lookup functions (see v3_handling.txt for the ones I am medium-sure about).
+
+## Resolved (final pass)
+1. Crash recovery
+- rec+0x154 is set to 3 on entering the crash state; decrements once per tick in states 3/4; at < 1 the state returns to 1. That is 3 ticks = 0.12 s at dt 0.04.
+- car_UpdateFallState tests counter == 3 (not the state byte). On that tick: rpm and speed damped by 0xFAE1 (0.98), sound 0x405, state 3 or 4 picked by lateral sign. Other ticks: velocity damped by 0xE8F5 (0.91). State 8 is a lateral-slide state.
+- GUESS: exact trigger condition of crash state 3.
+
+2. The 1.41
+- DAT_0603208c = 0x168F5 = 1.41. Lean angle rec+0x134 = -Atan2(rec+0x124, 1.41). Meaning GUESS: lever/reference length.
+- Spring-damper error = rec[0xcc] - FixedMul(rec[0xd0], 0x828F (=0.51)) - FixedMul(300.0, rec[0x124]).
+
+3. Slope / drag force
+- car_ComputeFixedPolynomial returns mass[slot]*p6 - 0.012*mass[slot]*p5 - drag. 0.012 = 0x312 (786). Drag = 0.0334 (0x88b = 2187) * Cd * v^2. Per-slot mass array at 0x0607910C.
+- GUESS: p5/p6 are pitch/gravity components passed on the stack (slope term).
+- car_ApplyScaledOffset multiplies by 9.81 (0x9cf5c) and divides by (mass + 12).

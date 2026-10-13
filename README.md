@@ -11,10 +11,10 @@ study and preservation.
 
 | Path | Content |
 |---|---|
-| `ghidra/hand_0.txt` | 1204 named functions of `0.AAA` (`0x<addr> func <name> hand <comment>`); 20 marked `provisional` are weak |
+| `ghidra/hand_0.txt` | 1204 named functions of `0.AAA` (`0x<addr> func <name> hand <comment>`); none provisional (three review rounds) |
 | `ghidra/funcinfo_0.tsv` | per-function export: `F` address name source size, `C` callee lines (string lines removed) |
 | `ghidra/scripts/` | `FindSh2FunctionsMem.java` (SH-2 prologue scan), `DumpLong.java`, the round-1 naming prompt |
-| `ghidra/naming/` | the round-2 review prompt and the list of names it reviewed |
+| `ghidra/naming/` | the round-2 and round-3 review prompts and the list of names it reviewed |
 | `ghidra/mxrun.sh` | headless Ghidra runner used here (edit the paths for your machine) |
 | `tools/` | `srptrs.py` (code-pointer discovery), `slice.py` (split the decompile for naming), `provctx.py` (caller context for the review round), `srprovapply.py` (apply verdicts by address), `rnc.py`, `elfarc.py` (list/extract CDIMAGE.ELF from your own disc) |
 | `study/` | study passes: `study_handling.md` (bike physics, steering/lean, gearbox, collisions, falls, bike stats, checkpoints), `study_ai_camera.md` (rival AI rubber band, Ghostrider, demo replay), `study_chasecam.md` (race camera), `study_archive.md` (CDIMAGE.ELF format) |
