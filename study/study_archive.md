@@ -69,3 +69,10 @@ Loads are by constant path strings; no code was found that indexes the TOC by nu
 
 ## 9. Extraction
 `py -3.13 -I tools/elfarc.py extract cd/CDIMAGE.ELF extracted/` wrote all 147 entries (76 MB) without error. BIFF written as BIFF (any PACK turned into BODY), VRI as `.chunks` ([u32 dest][u32 len][data] records), AVI and TSK raw.
+
+## Resolved (guess dig, 10-13)
+- The 64 sectors after the last TOC entry (sector 38610..38673, 131072 bytes) are the ASCII string "TANTALUS" repeated (Tantalus = the developer): filler, not data.
+- rle_Decode 0x06042114 and lz_Decompress 0x06042208: no literal-pool reference and no bsr/bra to either anywhere in 0.AAA = unused in the shipped program (confirmed).
+- Entry 5 MANXSNDS: CONFIRMED sound RAM. RBHH block 0 (0x370 bytes, ptr 0) is heap; blocks 1-46 have preset ptrs 0x25a10000..0x25a79df0 (last size 0xe30), i.e. SCSP sound RAM at +0x10000 (not 0x25A0xxxx; the driver SDDRVS.TSK occupies 0x25a00000, see sound_LoadDriverAndInit 0x0604a0e8, snd_LoadSoundDriver 0x0605bf94, snd_FindTableEntryByKey 0x0605ccbc). res_LoadChunkedFile 0x06041e1c reads each BODY straight to the preset address and zeroes the size so it is never freed. Path string at 0x06014698, loaded via pools 0x060148d8 / 0x06014a50 / 0x06015960.
+- Entry 6 (hash 0xe94dec14, 73808 bytes, 8 rows): still [guess: unused]. Block 0 (0x8c bytes) plus 7 blocks at 0x25a10000..0x25a20e50 are byte-identical to MANXSNDS blocks 1-7 (a lighter subset sound bank). No literal 0xe94dec14 and no path string in 0.AAA, so no loader exists.
+- Region (item 5): PAL. IP.BIN (track01.bin offset 16) reads "SEGA SEGASATURN SEGA ENTERPRISES MK-81210 V1.000 19970217 CD-1/1 E JSE MANX TT SUPER BIKE"; area symbol field = "E" (Europe), peripherals "JSE", release date 1997-02-17; the cue names it "Manx TT SuperBike (Europe)". CONFIRMED.

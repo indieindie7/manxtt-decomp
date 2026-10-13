@@ -112,3 +112,6 @@ State = camera record int[0x14]. Presets in ROM table 0x0602cda8 (stride 0x48, e
 
 View button cycle (0x0602d44a): entry index 2 -> 3 -> 4 -> wraps to 2, each load sets the timer to 7. Because state 4 returns to 2 when its timer expires, the visible cycle is first person (2) <-> near chase (3), with 4 as a 7-frame blend step. The button works only in game modes 0xf..0x12 (byte 0x06088c0c - 0xf < 4) and when the per-player flag 0x0606ea4c[p] is set.
 Corrections to older lines: state 2 is confirmed first person; state 1 is the same rig without the 0.1 height scale and has no known user; state 4 is a short roll/blend state, not a persistent cockpit view (supersedes the "cockpit-like" line in Resolved (final pass) item 4).
+
+## Resolved (guess dig, 10-13)
+- Camera states 0, 1, 7 (and 0xe): RESOLVED, unreachable in the shipped program. Only writers of the state (cam rec +0x50) are cam_InitState (writes 0xf or 5), cam_UpdateByState (view-button cycle 2..4, default 2, state-4 timeout back to 2) and cam_ApplyViewPreset with the ROM presets 0x0602cec8 (state 4), 0x0602cf10 (3), 0x0602cf58 (6), 0x0602cfa0 (3) plus the cycle entries 2-4. No writer produces 0, 1, 7 or 0xe, so those branches are dead code (leftover from development views).
