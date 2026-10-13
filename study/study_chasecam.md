@@ -13,7 +13,7 @@ The camera is a per-player "car_*" record (0x188 bytes each, DAT_0602d2b4 = 392,
 - tlCamera (camera_TaskHandler@0604d1d0) is only the viewport and perspective table. Made in gamestart_TaskMain@060252a4 (task +0x58 P1, +0x5c P2). Only it calls gfx_BuildScreenScaleTables@0604d524.
 
 Camera record int fields: [0..2] position, [3..5] local offset, [6..8] pivot, [9] pitch, [10] yaw, [11] roll, [0xc..0xe] angle offsets, [0x11] ushort course lookup, [0x13] nearest course point, [0x14] view state, [0x15] racer id, [0x17] transition timer, [0x18..0x1a] target offset, [0x1d] target roll, +0x178 player index.
-Racer records: 0x40 bytes at 0x0606ee48 (+0..8 pos, +0xc pitch, +0x10 yaw, +0x14 roll/lean, +0x24 speed). Bike physics record 0x16c bytes near 0x0607c480 (+0x2e bike state, GUESS 8 = crash).
+Racer records: 0x40 bytes at 0x0606ee48 (+0..8 pos, +0xc pitch, +0x10 yaw, +0x14 roll/lean, +0x24 speed). Bike physics record 0x16c bytes near 0x0607c480 (+0x2e bike state: 2 wall flag, 3/4 crash, 8 lateral slide).
 
 ## 2. Views and the view button
 - car_InitState: game-mode byte (0x06088c0c) 0 or 0x15 gives state 0xf (out of range, default case becomes 2). Otherwise state 5 (intro), timer 0x32 = 50 frames, offset (0,-4.0,-200.0) lerping to (0,-4.0,-26.0).
@@ -25,7 +25,7 @@ Racer records: 0x40 bytes at 0x0606ee48 (+0..8 pos, +0xc pitch, +0x10 yaw, +0x14
 ## 3. Chase camera maths (states 3 and 4)
 | Item | Value |
 |---|---|
-| Target offset (preset 3, words 9,0xa) | (0, -4.0, -26.0): 26 behind, 4 up (GUESS: negative Y is up) |
+| Target offset (preset 3, words 9,0xa) | (0, -4.0, -26.0): 26 behind, 4 up (negative Y is up: Y is down-positive, confirmed by the ground probes) |
 | Offset blend | each frame cur += FixedMul(target-cur, Div(0x10000, timer)); done when timer hits 0 (7 frames) |
 | Pivot | racer pos + local (0, -12.0, +7.0) after RotY(-yaw), RotX(pitch); DAT_0602d820 = -12, DAT_0602d81c = 7 |
 | Speed pull-back | state 3 only, game mode < 0x12: extra local Z of -(speed(+0x24) >> 3) |
@@ -61,12 +61,12 @@ Image 0.AAA at 0x06010000, big-endian. Values read from ROM/decomp_0.c. Unproven
 | 1 | 0x560 | 0x70 | 0x88 | 0x88 |
 | 2 | 0x440 | 0x440 | 0x3000 | 0x70 |
 
-- GUESS: physical button names per bit (0x70 as a view button for the default preset is odd; may be A/B/C face buttons).
+- Button names per bit resolved: see Resolved (trim pass).
 
 2. Focal flag 0x06025ab4
 - Reads global word 0x0607ec18: nonzero -> 350 (0x15e), zero -> 232 (0xe8).
 - Written 0 in boot_TaskEventHandler, 1 in game_NextTrackDecide (0x06016470) and congrats_TaskHandler (0x0601f090), 2 in title_TaskMain (0x06023750).
-- GUESS: 0 = in-race, 1 = menu/result, 2 = title.
+- Values: see Resolved (trim pass); 0 = live race, nonzero = non-race flow.
 
 3. Look-ahead clamp
 - x = FixedMul(Div(dA<<16, dB)>>1, 0xb2b8 (=0.698)). If |x| > 0x82 (130 raw) then x = FixedMul(+-0x10000, 0x82) = +-130 raw (about 0.002 as 16.16, not 130.0). Then cam[10] += FixedMul(x, 0x1a): 0 for positive x, -1 for negative. Effectively dead.
@@ -82,4 +82,15 @@ Image 0.AAA at 0x06010000, big-endian. Values read from ROM/decomp_0.c. Unproven
 | 0x0602cf58 | 6 | look-at words 20, -8, -80, 10, -20, 80 | 75 | race_EndTimerTickB 0x0603a22c at timer == 225 |
 | 0x0602cfa0 | 3 | -30, -200 | 300 | race_EndTimerTickA 0x0603a054 (at 100); race_FinishToResultsA 0x0603a4b4, B 0x0603a550, C 0x0603a648 |
 
-- State 4 has a zero offset, so it is cockpit-like (GUESS); earlier text calling it a chase variant is superseded.
+- State 4 has a zero offset, so it is cockpit-like; earlier text calling it a chase variant is superseded.
+
+## Resolved (trim pass)
+1. Pad word bit order (table at 0x0606e9e0, 8 words per cfg: 0x40, 0x20, 0x10, 0x200, 0x100, 0x400, 0x08, 0x80; cfg2 ends 0x1000, 0x2000). It matches the Saturn SMPC digital pad word (data0 high byte, data1 low byte): bit 15 Right, 14 Left, 13 Down, 12 Up, 11 Start, 10 A, 9 C, 8 B, 7 R, 6 X, 5 Y, 4 Z, 3 L. Table order is therefore X, Y, Z, C, B, A, L, R.
+2. Action 0xC4 (view) masks decoded:
+- 0x70 = X + Y + Z
+- 0x88 = R + L (shoulders)
+- 0x560 = A + B + X + Y (0x400 + 0x100 + 0x40 + 0x20)
+- 0x440 = A + X
+- 0x3000 = Up + Down (D-pad)
+So the default cfg 0 / preset 0 view button is any of X, Y, Z; preset 1 and 2 use the shoulder buttons; preset 3 face buttons A/B/X/Y. Bit 0x1000 (Up) and 0x2000 (Down) only appear in cfg 2's table.
+3. Word 0x0607ec18 (referenced by about 55 literal pools, 0x06014a68..0x06039d40, mostly menu/title code 0x06024xxx-0x06029xxx): written 0 in boot_TaskEventHandler, 1 in game_NextTrackDecide (pool 0x06016470) and congrats_TaskHandler (0x0601f090), 2 in title_TaskMain (0x06023750). Read by tlCamera focal choice (0x06025ab4: nonzero 350, zero 232) and by car_UpdateThrottleSpeed (0x06032ad4: nonzero means scripted throttle 0.9 [0xe666], brake 0). Conclusion: 0 = live race with player input; nonzero = non-race flow (1 menu/results/congrats, 2 title). Finer meaning of 1 vs 2 is only visible in the menu code and not traced.

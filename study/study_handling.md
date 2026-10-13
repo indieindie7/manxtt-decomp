@@ -36,7 +36,7 @@ Physics step dt = 0x0A3D = 0.04 s (guess: 25 Hz physics tick). Gravity 0x9CF5C =
 ## 3. Steering and lean
 - bike_UpdateSteeringTorque (@060384CC): input shaped by a cubic (fine control near center), scaled down with speed, clamped to +-0x1A, multiplied by 56.4 then 0.04.
 - car_UpdateHeadingAngle (@06032714): heading relative to the course clamped to +-0x33C (about +-73 deg). Self-centering: MulHigh(rec+0x110, 0x4B4F). Steer input decays 0x22 per tick when released.
-- car_UpdateLeanBalance (@06031F14): a spring-damper on lean displacement: spring 300.0, damping 0.51. Lean angle = -atan2(rec+0x124, 1.41) (1.41 = DAT_0603208c = 0x168F5 = 1.40999, the constant second argument of Atan2; read as a lever-arm length, GUESS, see Resolved (final pass)). So the bike leans against the lateral displacement, and the lean angle turns the heading (steer comes through lean, not directly).
+- car_UpdateLeanBalance (@06031F14): a spring-damper on lean displacement: spring 300.0, damping 0.51. Lean angle = -atan2(rec+0x124, 1.41) (1.41 = DAT_0603208c = 0x168F5 = 1.40999, the constant second argument of Atan2; lever-arm-like constant; no further meaning recoverable). So the bike leans against the lateral displacement, and the lean angle turns the heading (steer comes through lean, not directly).
 - Counter-steer feel (guess): because input drives a spring-damper lean and lean drives heading, there is a short lag then a settled turn, and releasing returns by spring plus the self-centering term.
 - car_UpdateSteeringSkid (@06032450): slip = atan2(lateral, forward); above 0x400 (90 deg units: threshold is large, effectively only in real slides) it triggers skid sound by frame mask.
 
@@ -44,7 +44,7 @@ Physics step dt = 0x0A3D = 0.04 s (guess: 25 Hz physics tick). Gravity 0x9CF5C =
 - Two probes: front (rec+0x4C) and rear (rec+0x70) via track_FindPolygonUnderPoint + track_ComputeSurfaceInfo.
 - Airborne if the height offset above the surface > 1.5696 (0x191D0). Grounded byte rec+0x148, air counter rec+0x14C.
 - Pitch is eased toward the surface slope from the two probes (so the bike pitches over crests); while airborne gravity 9.81 integrates vertical speed.
-- Slopes: car_ComputeFixedPolynomial adds slot-mass-weighted terms from three stack-passed components; the exact pitch/gravity split is still GUESS (see Resolved (final pass)).
+- Slopes: car_ComputeFixedPolynomial adds slot-mass-weighted terms from three stack-passed components; p5 = local normal y, p6 = local normal z of the rear ground probe (see Resolved (trim pass)).
 
 ## 5. Grip / slide
 - No tire model per se; lateral velocity rec+0x110 is damped by self-centering (0x4B4F factor) and slip angle is only used for sound/effects. Slides are visual/audio, not a separate friction regime (guess).
@@ -97,13 +97,48 @@ Physics step dt = 0x0A3D = 0.04 s (guess: 25 Hz physics tick). Gravity 0x9CF5C =
 1. Crash recovery
 - rec+0x154 is set to 3 on entering the crash state; decrements once per tick in states 3/4; at < 1 the state returns to 1. That is 3 ticks = 0.12 s at dt 0.04.
 - car_UpdateFallState tests counter == 3 (not the state byte). On that tick: rpm and speed damped by 0xFAE1 (0.98), sound 0x405, state 3 or 4 picked by lateral sign. Other ticks: velocity damped by 0xE8F5 (0.91). State 8 is a lateral-slide state.
-- GUESS: exact trigger condition of crash state 3.
+- Crash trigger resolved: see Resolved (trim pass) item 2.
 
 2. The 1.41
-- DAT_0603208c = 0x168F5 = 1.41. Lean angle rec+0x134 = -Atan2(rec+0x124, 1.41). Meaning GUESS: lever/reference length.
+- DAT_0603208c = 0x168F5 = 1.41. Lean angle rec+0x134 = -Atan2(rec+0x124, 1.41). Meaning of 1.41 not recoverable from code (only used as Atan2 divisor).
 - Spring-damper error = rec[0xcc] - FixedMul(rec[0xd0], 0x828F (=0.51)) - FixedMul(300.0, rec[0x124]).
 
 3. Slope / drag force
 - car_ComputeFixedPolynomial returns mass[slot]*p6 - 0.012*mass[slot]*p5 - drag. 0.012 = 0x312 (786). Drag = 0.0334 (0x88b = 2187) * Cd * v^2. Per-slot mass array at 0x0607910C.
-- GUESS: p5/p6 are pitch/gravity components passed on the stack (slope term).
+- p5/p6 resolved as the local-frame ground normal y/z, see Resolved (trim pass) item 1.
 - car_ApplyScaledOffset multiplies by 9.81 (0x9cf5c) and divides by (mass + 12).
+
+## Resolved (trim pass)
+All values read from cd/0.AAA (big-endian, base 0x06010000) and the SH-2 disassembly. Y is down-positive. Bike record rec = 0x0607c480 + slot*0x16c.
+
+### 1. Slope pitch and gravity: step-by-step formula
+Per tick, bike_UpdateRacerPhysics (0x0602f7d0), main race path:
+1. Rear probe point P2 = (rec.x, rec.y + 0x4f97 raw (0.3109), rec.z) at 0x060301f8-0x060301fc. track_FindPolygonUnderPoint (0x0602e0d4) then track_ComputeSurfaceInfo (0x0602e82c) write the result to rec+0x70. Its fields: normal (A,B,C) at rec+0x80/0x84/0x88, height h2 = groundY - pointY at rec+0x8c, flags rec+0x90.
+2. Front probe point P3 = rec position + R(-yaw)*(0, 0.2 [0x3333], 14.0 [0x000e0000]) (vector at 0x0602eb6c); its y is then set to (rec.y + 0.2) + 0x4b50 raw (0.2942). Result goes to rec+0x4c: normal rec+0x5c/60/64, h3 at rec+0x68, flags rec+0x6c.
+3. Grounded test on h2 (0x0603030a-0x0603030c): threshold 0x000191d0 = 1.5696 (= 0.16 * 9.81).
+   - h2 > 1.5696: airborne. rec+0x148 = 0 and rec+0x28 = rec.y + h2 (ground height shown under the bike) when h2 > 1.0 (0x0000ffff), otherwise rec+0x28 = rec.y. rec.y is NOT changed.
+   - h2 <= 1.5696: grounded. If rec+0x148 was 0 (landing): rec+0xf0 = FixedMul(rec[0xd8], rec[0xd0]) (landing kick, use not traced). Then rec+0x148 = 1, rec.y += h2 (snap to ground, so rec.y = groundY), rec+0x28 = rec.y.
+   - rec+0x149 is the previous tick's grounded flag; rec+0x14c counts airborne ticks (0x060307fc-0x060308aa: +1 per tick while rec+0x148 == 0, reset to 0 on the tick after a grounded tick).
+4. Target pitch rec+0xb8 (0x06030544-0x06030590):
+   - grounded: rec+0xb8 = Atan2( (P2.y + h2) - (P3.y + h3), 14.1 [0x000e1999] ), i.e. rear ground height minus front ground height over a 14.1 baseline. Y is down, so rear lower than front (uphill) gives a positive angle.
+   - not grounded but grounded last tick (takeoff): if (h3 - h2) > 0x27fff (2.5) then rec+0xb8 = rec+0xc + 0xe3 (227 = 20 deg on the 0x1000 scale); else unchanged.
+   - otherwise unchanged.
+5. Pitch easing: rec+0xc += FixedMul(rec+0xb8 - rec+0xc, 0x4ccc [0.3]) (16-bit constant, 0x06030594 area). The same pitch is copied to the racer record at 0x0606ee48 + idx*0x40 + 0xc.
+6. Force along the slope (car_UpdateThrottleSpeed 0x06032918, also the AI copy in ai_UpdateRacerSpeedGear 0x06033774): the REAR probe normal (rec+0x80/84/88) is rotated by +yaw (rec+0x10) into the bike frame, giving (nx', ny', nz'); local +z is forward. These go on the stack as p4 = nx' (unused), p5 = ny', p6 = nz'.
+   car_ComputeFixedPolynomial (0x06032fb8): F_poly = m*nz' - 0.012*m*ny' - Drag, where m = mass[slot] (array 0x0607910c), 0.012 = 0x0312 raw (786), Drag = 0.0334 [0x088b] * Cd [bike table 0x0606f6d4 + slot*0x20, field +8] * v^2 (car_ComputeDragForce). So the slope/gravity part is m*nz' (the forward component of the unit ground normal, i.e. sin of slope) and the rolling resistance part is 0.012*m*ny' (cos of slope).
+   Total F = F_engine + F_poly - F_brake + F_catchup (catchup only when v > 5.0 [0x4ffff]). F_engine and F_brake come from the gear/rpm tables via table_CalcInterpolatedOffset / table_MulEntryField; throttle and brake are 0..1.0 (see item 3 of this section for forced values). Engine force is scaled by 0.9 [0xe666] if rec+0x33 == 1 and 0.6 [0x9999] if rec+0x33 == 3 (0x06032ad8 / 0x06032af8), and divided by |rec+0x110| when |rec+0x110| > 1.0.
+7. Speed: a = F * 9.81 [0x9cf5c] / (m + statMass) (car_ApplyScaledOffset 0x06032f58; statMass = bike table field +4); rec+0xc0 = FixedMul(a, 0x0a3d [0.04 s]); speed rec+0x24 += rec+0xc0. Speed floored at 0. Displayed speed = FixedMul(speed, 0x39999 [3.6]) (0x06032c70), capped at 140.0 [0x008c0000] when above 0xd1ffff, with the 70 offset rule above 70.
+8. Airborne (rec+0x148 != 1 and rec+0x14c >= 5): no engine/slope force; speed += FixedMul(ApplyScaledOffset(Drag(speed)), 0x0a3d). Only drag acts.
+9. Vertical motion: there is NO vertical velocity and no gravity integration in bike_UpdateRacerPhysics or car_UpdateRacerMotion (0x060314b8; same probe block repeated at 0x060319cc/0x06031b04). 9.81 appears only as the unit factor in item 7. Airborne, rec.y simply stays at its last grounded value (only rec+0x28 follows the ground), and the bike snaps to rec.y += h2 on the next tick with h2 <= 1.5696. Only the visual pitch (item 4, +227 nose-up on takeoff, eased at 0.3/tick) changes in the air.
+10. Unknowable from code alone: the sign convention of the course-data normal (n = (P2-P1) x (P0-P1) normalised, polygon winding set by the course files, which I could not parse). Consistency check: the rolling term -0.012*m*ny' must decelerate on flat ground, so ny' > 0 (B > 0) in the rear-probe output; then the slope term acts as +m*nz'.
+
+### 2. Crash trigger (state byte rec+0x2e)
+Top of bike_UpdateRacerPhysics, in this order:
+- (rec+0xb4 & 0x80) set (head probe on a flag-0x80 polygon): state 2, rec+0x150 = 3.
+- else (rec+0x90 & 0x80) set (rear probe): state 2, rec+0x150 = 1. Bit 0x80 is the track polygon attribute copied into probe flags; its meaning is track data (wall-type), not decodable from code.
+- else, idx = byte at 0x0606e624[slot]; if byte racerrec[0x0606ee48 + idx*0x40 + 0x31] != rec byte +0x30 (own index) and state != 0: rec+0x154 = 3, state = 3 (crash).
+- racerrec+0x31 is written by car_FindNearbyCars (0x0602cb68) with the index of a neighbouring bike when 3*max(|dx|,|dz|) + min(|dx|,|dz|) (integer parts) is < 0x2b (43). It is reset to the own index at the end of each physics tick. So crash state 3 = another bike within a metric of 43 world units. Then car_UpdateFallState (0x060321bc) on counter == 3 picks state 3 or 4 by the sign of the local x of the push vector (<= 0 state 3, > 0 state 4).
+- state 8 is set if rec+0x110 != 0 and none of the above applied (lateral slide, ends when rec+0x110 returns to 0).
+
+### 3. Throttle and brake values (car_UpdateThrottleSpeed 0x0603292c-0x0603297e)
+Char at 0x06088c0c: 0x11, 0x12, 0x13: throttle 0, brake 1.5 [0x00018000]. 0x0d: throttle 1.0 [0x00010000], brake 0. Otherwise: if word 0x0607ec18 != 0: throttle 0.9 [0x0000e666], brake 0; if 0: both from math_NormalizedShortRatio / _2 (player input).

@@ -54,14 +54,19 @@ Racer record = 0x40 bytes per rider. Race state byte: 0x10 = racing, 0x13 = fini
 1. Gear thresholds (ai_UpdateRacerSpeedGear)
 - DAT_06033882 = 0xBC (rpm field offset); gear at +0x140.
 - DAT_0603388c = 0x36B00000 = 14000.0 (upshift rpm). DAT_06033890 = 0x1B57FFFF ~ 7000.0 (downshift).
-- Downshift sets state bits 0x20 (gear 2), 0x40 (gears 3-4), 0x80 (gears 5-6). GUESS: structure is an else branch.
+- Downshift sets state bits 0x20 (gear 2), 0x40 (gears 3-4), 0x80 (gears 5-6). Not an else branch: see Resolved (trim pass).
 
 2. Shove decay
 - DAT_0603604e = 0x028F = 655 = 0.01. The +0x68/+0x6c velocities decay 1% per frame; impulse words +0x70/+0x74 are added into them and collapse to 1% per frame.
 
 3. Speed table of ai_SelectSpeedTarget
 - At 0x0606EAAC: 29 entries of 8 bytes {base, slope}, 16.16, set stride 232 bytes. Set 0 at 0x0606EAAC, set 1 at 0x0606EB94, set 2 at 0x0606EC7C, empty set 3 at 0x0606ED64.
-- Index = RAM byte 0x0607f72c * 29 + sub-index (meaning of that byte GUESS, likely difficulty). Result = base - gapfield(rec+0xa0) * slope via FixedMul with speed. Speed floor 0x13ffff (~20.0); gap threshold 0x3332 (0.2).
+- Index = RAM byte 0x0607f72c * 29 + sub-index (byte meaning: see Resolved (trim pass)). Result = base - gapfield(rec+0xa0) * slope via FixedMul with speed. Speed floor 0x13ffff (~20.0); gap threshold 0x3332 (0.2).
 - Sub-index map: +3 cone/behind case, +4 default, +0x15..0x1c gap bands, +0xd+count ahead cases.
 - Set 1 differs from set 0 at indices 22 and 26; set 2 is a harder set. Full first-13 entries are in section 8 of this report.
 - Checked 10-13 (main chat): the AI shift points differ from the player's. Player bike_UpdateGear 0x06037728 uses 0x32c80000 = 13000.0 up (0x06037844), 0x270fffff ~ 10000 down (0x06037848), plus 0x2af7ffff ~ 11000 (0x0603784c); the AI's own gear code uses 14000 / 7000. Same engine model, different shift points.
+
+## Resolved (trim pass)
+1. ai_UpdateRacerSpeedGear (0x06033774): the shift code is two sequential ifs, not an else branch. At 0x06033792: if rpm (rec+0xbc) > 14000.0 [0x36b00000], gear (rec+0x140) is incremented when gear <= 5 (0x0603379e-0x603a6). Then rpm is reloaded and at 0x060337ac: if rpm <= 7000.0 [0x1b57ffff] and gear > 1, a jump table (0x060337c4) ORs 0x20, 0x40 or 0x80 into rec byte +0x2e and gear is decremented (0x060337fa). After an upshift rpm is still above 7000, so the two cannot both fire in one call. Gear 1 never downshifts.
+2. Byte 0x0607f72c: written in courseselect_TaskHandler (0x0601a612-0x0601a624: constants 0 and 2, or a menu field at +0x174 stored byte-wide) and hiscore_TaskHandler (0x06018f6a-0x06019000, values 0/2/menu field); read by load_SetupLoadingScreen (0x06024912) and ai_SelectSpeedTarget (0x06034e9c, times 29). It is the course/class selection chosen on the course-select screen (values 0..2); the exact on-screen label (difficulty or course) was not traced. It picks the AI speed table set, set 3 being empty.
+3. Rubber-band direction (line 12) stays an inference; the ghost sampling rate (lines 23, 28) is also unconfirmed.
