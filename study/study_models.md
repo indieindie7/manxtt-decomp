@@ -111,3 +111,30 @@ row = bikeSel*2 + LOD when *0x06088398 == 3, else bikeSel + 0x18 with LOD forced
   Rider root: Push, RotX(racer field B + ...), T(0, clamped field*0x6664 - 22.0, 0), RotY(0xf800 = -180 deg), T(lerp key xyz *4); then the 11-part pose.
 - POSED RIDER VERIFIED (tools/riderpose.py, rotation matrices standard right-hand in game space, M = parent*T*Rz*Ry*Rx): PRIDERS row 6
   (blue leathers = BHONDA1, bikeSel 3) with clip 1 key 7 sits on the BHONDA1 body with hands on the bars; keys 0 / 14 hang off opposite sides.
+
+## Resolved (models open items, 10-13)
+- *0x06088398 = race phase (state_DispatchByMode 0x060394b0 indexes a handler table by it): 0/1 race_InitState, 2 countdown
+  (race_CountdownTickA), 3 = RACE RUNNING (set at the end of the countdown with race-state byte 0x10 = go, race_CountdownStepA /
+  race_CountdownTickB), 4 after the finish (race_UpdateCheckpointLap, byte 0x12), 6/7 end timers, 8 continue, 9/0xb gamestart /
+  attract, 10 results. So PRIDERS rows 0..23 (bikeSel*2 + LOD) are used only while racing; rows 24..35 (bikeSel + 0x18, LOD 0)
+  on the grid, in attract and on results.
+- Bike rec +0x24 = SPEED: the 0x40-byte table at 0x0606ee48 is a copy of the first 0x40 bytes of the racer record (mem_CopyBlocks64
+  at the end of bike_UpdateRacerPhysics / car_UpdateRacerMotion / car_SpawnAtTrackPoint), and racer rec+0x24 is speed
+  (study_handling.md). Rider idles (clip 2) at speed <= 0x4ccc (0.3).
+- Bike draw style = low nibble of rec+0x2f (byte 0x0606ee77), table 0x0602a2a0 used by bike_PlotBikeSlotsOrdered / bike_PlotBikeDispatch:
+  0 bike_DrawBikeWithShadow, 1 bike_DrawModelParts, 2 bike_DrawAdvertiseModel, 3 bike_DrawModelPartsChecked, 4 bike_DrawModelPartsAnimated.
+  bike_InitRacer sets 0 or 3; car_SpawnAtTrackPoint (only caller task_MainGameLoopADVCreate = the attract "mainGameLoopADV") sets 2.
+- TYRES objects 4/5 (99/101 v) = high-detail front/rear wheels, drawn only by bike_DrawAdvertiseModel 0x0602b7dc (attract mode),
+  front +0x10 at the same offset as the race wheel, rear +0x14.
+- RIDER_M clip 0, clip 4, states 5 and -1 are UNREACHABLE in the shipped game: every caller of rider_UpdateAnimPathDraw
+  (bike_DrawBikeWithShadow, DrawModelParts, DrawAdvertiseModel, DrawModelPartsChecked, DrawModelPartsAnimated, DrawRiderParts,
+  DrawWheelPart) requests state 1, and the only other writers are player_InitSlots8 (lock byte 1, state 0, clip 0, time 0) and
+  rider_SetAnimPathDraw 0x0603c7d8 (clip 1 lean, no state machine). State 0 switches to clip 2 at time 4.0 before the first draw,
+  so clip 0 (1 key) is never shown. [guess] clip 4 and state -1 are leftovers (e.g. a dropped podium/menu pose).
+- Finish clip 3 detail: entered only from state 2 (stopped, speed <= 0.3) when the race byte at 0x06088c0c is 0x13 AND the
+  player index equals (rank P2 < rank P1) (rank byte rec+0x32, 0x0606ee7a / +0x40) = only the LEADING human plays the finish clip.
+- ERIDERS = rival (computer) riders, drawn by bike_DrawRiderModel 0x0602aef8 (draw style 0 path; body EBIKES slot 0x11c, wheels
+  TYRES 0x124). Each ERIDERS row is ONE rigid pre-posed mesh (110-113 v, 1 group, no skeleton, no RIDER_M). Row = base + step:
+  base = (slot-1)*8 for slots 1..4, else 0x18 (slots 5+ share skin 4) -> 4 skins x 8 rows (rows 32..35 unused [guess]).
+  Step by roll rec+0x14 (12-bit): LOD 0: < -341 -> 0, < -170 -> 1, > 341 -> 4, > 170 -> 3, else 2 (upright); LOD 1: < -170 -> 5,
+  > 170 -> 7, else 6; LOD >= 2 -> ERIDERS root[0]. Thresholds +-170 = 15 deg, +-341 = 30 deg. Render check: models_out/078_ERIDERS/lean5.png.
