@@ -14,3 +14,10 @@ User 10-13: "can you now do manx tt for the saturn please". Same pipeline as Doc
 - Round 1 DONE (10-13): naming/h1..h8 (78/112/84/166/169/155/262/178) -> ghidra/hand_0.txt 1204 lines, 373 provisional; 4 dup names got _2 (0x06040fe8 rect_Set, 0x06063018 gfs_PlanReadChunk, 0x06067c1c movie_OpenFile, 0x0606af3c strcmp). ApplyNames 1204 named; funcinfo re-exported (0 FUN_); decomp_0.c re-dumped (66610 lines). Backup naming/hand_0_r1.bak.
 - Round 2 (10-13): tools/provctx.py patched (base '0' = 0x06010000, image .AAA); naming/prov_list.txt = provisional + _N names (398) -> naming/r2_1..8.txt; prompt naming/prompt_r2.txt; 8 Sonnet agents -> naming/v2_1..8.txt; apply with tools/srprovapply.py ghidra/hand_0.txt naming/v2_*.txt.
 - Round 2 DONE (10-13): v2_1..8 (398 verdicts): confirmed 232, renamed 121, unsure 20 -> hand_0.txt 1204 lines, 20 provisional, no dups. ApplyNames 1204, Ghidra == hand file (0 diffs), 0 FUN_. Top prefixes: cdc 114, gfs 99, movie 66, snd 52, stub 41, softfp 40, car 37, GFS 35, math 31, bup 30, bike 29, hud 26.
+
+## Log after publishing (10-13)
+- Studies: handling, AI + ghost, chase camera, archive, models (study/*.md); each has "Resolved" sections from the trim, drill, models and guess-dig passes.
+- Models: player bike = livery RBH (3 LOD), wheels from TYRES, PRIDERS per-livery rider skins + RIDER_M clips, ERIDERS rigid lean-step riders; tools rbh2obj.py, riderpose.py, objview.py.
+- Guess dig: disc PAL, AI pace handicap, unreachable camera states and rider clips, unused decompressors.
+- HANDOFF-scorcher.md: summary handed to the Scorcher modding project.
+- Manx TT DONE.
