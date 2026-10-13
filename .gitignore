@@ -1,0 +1,8 @@
+*.bin
+*.iso
+*.cue
+*.c
+*.gpr
+*.rep/
+cd/
+image/
