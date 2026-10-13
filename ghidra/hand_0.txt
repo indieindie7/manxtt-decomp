@@ -202,16 +202,16 @@
 0x0602cad0 func path_ComputeSegmentValue hand computes value from three consecutive 0x1c-byte waypoint records and stores into entries
 0x0602cb68 func car_FindNearbyCars hand pairwise compares car positions, marks close pairs in car records at offset 0x31
 0x0602cc8c func car_SortByProgress hand selection-sorts cars by lap and progress fields, writes rank to car+0x32 and copies to rank table
-0x0602d008 func vec_BuildRotatedVector hand matrix push, rotates by angles, computes 3-component output vector via fixed-point helpers
-0x0602d08c func table_CallOnEntry hand calls helper on table entry at base plus index times stride
+0x0602d008 func cam_LookAtAngles hand look-at angles via Atan2 (was vec_BuildRotatedVector)
+0x0602d08c func cam_InitEntry hand calls cam init (was table_CallOnEntry)
 0x0602d0b0 func table_GetEntryPtr hand returns pointer to table entry at base plus index times stride
-0x0602d0c4 func car_InitState hand initialises car record fields, finds nearest waypoint, clears per-wheel arrays
-0x0602d29c func table_CallOnEntry_2 hand calls helper on table entry at base plus index times stride, second table
-0x0602d2c8 func car_UpdateByState hand large switch on car state field 0x14: shifts position history, blends fields, rebuilds matrix and orientation
-0x0602dc8c func car_SnapToStartPosition hand copies position and angles from start-grid entry, builds matrix and stores transformed position
-0x0602dd8c func car_ApplyTransformFromState hand matrix push, translate by pos, rotate by angles, store transformed position to car record
-0x0602ddf4 func car_ApplyInitParams hand copies position, rotation and velocity vectors from parameter block into car table entry fields
-0x0602def8 func matrix_ApplyInverseCarTransform hand applies inverse rotations and translation of car record, stores angles in caller record
+0x0602d0c4 func cam_InitState hand per-player camera record init (0x188 stride) (was car_InitState)
+0x0602d29c func cam_UpdateEntry hand per-frame call into cam_UpdateByState (was table_CallOnEntry_2)
+0x0602d2c8 func cam_UpdateByState hand per-frame chase/first-person camera driver (was car_UpdateByState)
+0x0602dc8c func cam_SnapToStartPosition hand places camera at racer (was car_SnapToStartPosition)
+0x0602dd8c func cam_ApplyTransformFromState hand camera record transform (was car_ApplyTransformFromState)
+0x0602ddf4 func cam_ApplyViewPreset hand loads view preset (ROM table 0x0602cda8, stride 0x48) (was car_ApplyInitParams)
+0x0602def8 func cam_ApplyViewMatrix hand builds inverse view matrix from camera pos/angles (was matrix_ApplyInverseCarTransform)
 0x0602df58 func table_GetOrSetEntry hand sets table entry at index when value nonzero, returns entry
 0x0602e014 func track_SetCurrentSection hand stores current section pointer, its sub-table and header word into globals
 0x0602e034 func vec_NormalizeFixed hand scales 3-vector down until in range then normalises using length via fixed-point divide helpers
@@ -262,7 +262,7 @@
 0x060330e0 func car_ComputeCatchupBonus hand rival-ahead distance and angle yield capped bonus value; zero when rank byte zero or flag 2 set
 0x060331dc func vec_RotateByAngle hand pushes matrix stack, rotates by angle, transforms three-component vector, pops 0x30 and writes result
 0x06033254 func vec_LerpXZ hand interpolates x and z components between two points by fraction, writes output vector
-0x060332ac func math_ApplyDeadzoneOffset hand adds constant offset to value outside positive or negative threshold, else returns unchanged
+0x060332ac func math_WrapAngle12 hand wraps a 12-bit angle into -0x800..0x800 (adds -+0x1000 past +-180 deg); used on heading/lean
 0x060332d8 func vec_DistanceScaled hand 3D distance via sqrt, halving components until within range then rescaling result
 0x06033380 func task_InitMainEnemy hand task init with string MainEnemy; copies racer positions into rank table, sets counts, clears 8 slots
 0x06033510 func car_UpdateNearestRivals hand computes distances from each racer to player, tracks two nearest rivals, flags approaching, updates rank lookup
@@ -280,7 +280,7 @@
 0x0603766c func table_MulEntryField hand returns entry field at +0x10 times param_2, entry table stride 0x20
 0x06037690 func math_NormalizedShortRatio hand ratio of short-array differences scaled 16.16 via divide helper, clamped 0 to max
 0x060376dc func math_NormalizedShortRatio_2 hand same ratio of short-array differences via divide, clamped 0 to max, other arrays
-0x06037728 func menu_UpdateSelectionLevel hand pad bits 0x10/0x20 adjust level 1-6 with counters and thresholds
+0x06037728 func bike_UpdateGear hand gearbox: gears 1-6, upshift at 13000 rpm, downshift at 10000, 26-tick delay between shifts
 0x06037854 func tasklist_Init hand clears counters, links head and tail sentinel nodes, installs pointer, calls init
 0x060378a0 func taskpool_LinkNodes hand chains 30 free task nodes via next pointer with name pointer set
 0x060378cc func taskpool_Alloc hand pops node from free list, zeroes first word, increments allocation count
@@ -348,8 +348,8 @@
 0x0603c3ec func math_FixedLerp hand fixed multiply blend a*(1-t)+b*t using multiply helper
 0x0603c420 func math_FixedLerpAngle hand angle blend with wraparound correction of difference then fixed lerp
 0x0603c478 func player_InitSlots8 hand sets flag byte to 1 and clears four fields in each of eight 0x18-byte slots
-0x0603c4a4 func view_UpdateCameraPathDraw hand per-player camera state machine 0-5 follows path of 16-byte keys with fixed lerp, builds matrix, calls scene draw
-0x0603c7d8 func view_SetCameraPathDraw hand sets camera slot state 1 with position from param, interpolates path key, builds matrix, calls scene draw
+0x0603c4a4 func rider_UpdateAnimPathDraw hand not a camera: per-player state 0-5 plays 16-byte rider pose keys (anim_InterpolatePoseMatrices) from racer position, builds matrix, draws
+0x0603c7d8 func rider_SetAnimPathDraw hand not a camera: sets up the rider pose-animation player (state 1, position from param), interpolates key, draws
 0x0603cc80 func snd_ClearChannelFlags hand sends sound command then clears two flag bytes of every dedicated channel in pointer list
 0x0603ccc8 func snd_PauseAllChannels hand sends sound driver stop commands per channel in list, sets paused flag, then loops 16 mask bits
 0x0603cd58 func snd_ResumeAllChannels hand re-sends sound command with saved id, volume and param per channel and clears paused flag

@@ -16,7 +16,8 @@ study and preservation.
 | `ghidra/scripts/` | `FindSh2FunctionsMem.java` (SH-2 prologue scan), `DumpLong.java`, the round-1 naming prompt |
 | `ghidra/naming/` | the round-2 review prompt and the list of names it reviewed |
 | `ghidra/mxrun.sh` | headless Ghidra runner used here (edit the paths for your machine) |
-| `tools/` | `srptrs.py` (code-pointer discovery), `slice.py` (split the decompile for naming), `provctx.py` (caller context for the review round), `srprovapply.py` (apply verdicts by address), `rnc.py` |
+| `tools/` | `srptrs.py` (code-pointer discovery), `slice.py` (split the decompile for naming), `provctx.py` (caller context for the review round), `srprovapply.py` (apply verdicts by address), `rnc.py`, `elfarc.py` (list/extract CDIMAGE.ELF from your own disc) |
+| `study/` | study passes: `study_handling.md` (bike physics, steering/lean, gearbox, collisions, falls, bike stats, checkpoints), `study_ai_camera.md` (rival AI rubber band, Ghostrider, demo replay), `study_chasecam.md` (race camera), `study_archive.md` (CDIMAGE.ELF format) |
 | `NOTES.md` | project log: disc layout, import, discovery, naming rounds, counts |
 
 `ApplyNames.java`, `ExportFuncInfo.java`, `CreateAt.java` and `CsDumpAll.java` are in
