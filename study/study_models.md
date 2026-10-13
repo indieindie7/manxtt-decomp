@@ -82,3 +82,32 @@ elbows/knees use RotZ only. Translations are 16.16, bones along local +X. Consta
 `py -3.13 -I tools/rbh2obj.py <file.RBH> <outdir> [--vri A.VRI.chunks ...] [--scale S] [--preview]`
 One OBJ per root (parts as OBJ groups), MTL, PNG per distinct texture (use --vri COMMON for rider, livery VRI for decals).
 Output is x, -y, z times scale, winding reversed. Not done: posed rider assembly with the skeleton above; ERIDERS/TYRES untested.
+
+## Resolved (models pass, 10-13): who loads what
+hud_LoadCommonArt 0x06027398 (mode 1, 1-player branch) loads into a resource struct (offsets are literal shorts at 0x06027586..0x060275a4):
+- 0xf0 = livery RBH (from table 0x0606e71c, 12 x 16 bytes {VRI path, RBH path, block, offset}; all block 0 / offset 0;
+  second set *2 at 0x0606e7dc); 0x12c (+player*4) = livery block 0 base = the per-player BIKE BODY LOD list.
+- 0x110 COMMON.RBH, 0x134 = COMMON block0 +4. 0x108 EBIKES, 0x11c its root. 0xf8 TYRES, 0x124 its root (wheels).
+- 0x10c MISC, 0x128 its root (shadow = root[5], read at +0x14). 0x100 PRIDERS, 0x118 its root. 0xfc ERIDERS, 0x120 its root.
+- 0x104 RIDER_M, 0x114 its root (animation set).
+bike_DrawModelParts 0x0602b524: body = *(*(s+0x12c+player*4) + LOD*4); wheels = TYRES root[LOD] (+0, +8), each RotX by a
+per-player spin at 0x0606f048 + player*4; the rider = rider_UpdateAnimPathDraw(RIDER_M root, PRIDERS root[row]),
+row = bikeSel*2 + LOD when *0x06088398 == 3, else bikeSel + 0x18 with LOD forced 0. Bike select byte: 0x06088f24 (player 1)
+/ 0x06088f18 (param_6 != 0). So PRIDERS rows are per-livery rider skins, NOT lean steps.
+- BIKE BODY CONFIRMED: livery RBH root = 3 objects {57-vertex body, 32-vertex low LOD, 4-vertex far card}, the same layout as EBIKES.
+  The earlier "decals only" line was wrong. The textured render (tools/objview.py) shows the full Honda; texture corner order A TL, B TR, C BR, D BL looks right.
+- Bike draw frame: body is drawn after Translate(0,-3,0) and Scale 0x4000 (0.25) on top of the bike matrix. Wheels (in the same scaled frame):
+  front = TYRES root[LOD] at T(0, 0xcccc=0.8, 0x386664=56.4), rear = root[LOD+2] at the origin; 56.4 x 0.25 = the 14.1 wheelbase.
+  TYRES objects 0/1 = 12 v, 2/3 = 18 v, 4/5 = 99/101 v (4/5 not used by bike_DrawModelParts [guess: bike select close-up]).
+- Angles: 12-bit (mtx_RotX 0x06059404 masks & 0xfff into the sin/cos table 0x0604e518, {sin,cos} 16.16). Matrix: column 0 = local X
+  (mtx_TranslateLocalX 0x0605925c adds p*m[0],m[3],m[6]); translation m[9..11].
+- RIDER_M block 0 = root table: clip0 0x130 (1 key), clip1 0x188 (15 keys), clip2 0x688, clip3 0x840, clip4 0xd94 (next entries 0xdec.. = other data).
+  rider_UpdateAnimPathDraw (state rec 0x0606f12c + player*0x18, +0x10 clip, +0x14 16.16 time); bike_DrawModelParts requests state 1, passes
+  param_8 = bike rec (0x0606ee48+p*0x40) +0x24 [guess: speed] and param_5 = rec+0xc (pitch, yaw, roll).
+  State 1 = clip 1 LEAN: time = (roll<<16)*0x1948b0fd>>35 + 7.0 (key 7 = upright, 15 keys) while param_8 > 0x4ccb.
+  Else state 2 = clip 2 STOPPED (idle; time 4.0, steps +-0.7841 bounce); when param_8 > 0x4ccc again it plays back to 0 then returns to state 1 at key 7.
+  Race finished (byte 0x13 at the race-state global, own player) -> state 3 = clip 3 forward once (step 0x6666/tick), holds last key.
+  State 5 (set by other callers) = clip 4 from 0. State 0 = reset to clip 2 at 4.0. State -1 = clip loops on a global timer.
+  Rider root: Push, RotX(racer field B + ...), T(0, clamped field*0x6664 - 22.0, 0), RotY(0xf800 = -180 deg), T(lerp key xyz *4); then the 11-part pose.
+- POSED RIDER VERIFIED (tools/riderpose.py, rotation matrices standard right-hand in game space, M = parent*T*Rz*Ry*Rx): PRIDERS row 6
+  (blue leathers = BHONDA1, bikeSel 3) with clip 1 key 7 sits on the BHONDA1 body with hands on the bars; keys 0 / 14 hang off opposite sides.

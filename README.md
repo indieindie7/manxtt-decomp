@@ -16,7 +16,7 @@ study and preservation.
 | `ghidra/scripts/` | `FindSh2FunctionsMem.java` (SH-2 prologue scan), `DumpLong.java`, `DumpAsm.java` (disassemble an address range), the round-1 naming prompt |
 | `ghidra/naming/` | the round-2 and round-3 review prompts and the list of names it reviewed |
 | `ghidra/mxrun.sh` | headless Ghidra runner used here (edit the paths for your machine) |
-| `tools/` | `srptrs.py` (code-pointer discovery), `slice.py` (split the decompile for naming), `provctx.py` (caller context for the review round), `srprovapply.py` (apply verdicts by address), `rnc.py`, `elfarc.py` (list/extract CDIMAGE.ELF from your own disc), `rbh2obj.py` (RBH/VRI model files to OBJ) |
+| `tools/` | `srptrs.py` (code-pointer discovery), `slice.py` (split the decompile for naming), `provctx.py` (caller context for the review round), `srprovapply.py` (apply verdicts by address), `rnc.py`, `elfarc.py` (list/extract CDIMAGE.ELF from your own disc), `rbh2obj.py` (RBH/VRI model files to OBJ), `riderpose.py` (pose a rider with a RIDER_M clip), `objview.py` (textured preview render) |
 | `study/` | study passes: `study_handling.md` (bike physics, steering/lean, gearbox, collisions, falls, bike stats, checkpoints), `study_ai_camera.md` (rival AI rubber band, Ghostrider, demo replay), `study_chasecam.md` (race camera), `study_archive.md` (CDIMAGE.ELF format), `study_models.md` (bike/rider meshes, rider poses, VDP1 textures) |
 | `NOTES.md` | project log: disc layout, import, discovery, naming rounds, counts |
 
