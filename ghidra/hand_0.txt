@@ -761,9 +761,9 @@
 0x0605adfc func sys_DelayLoop hand busy-wait loop decrementing a local counter from param to zero
 0x0605ae20 func cache_InitClear hand SH-2 cache control: disables cache, clears all four ways of tag lines, then sets CCR flags and enables
 0x0605aed4 func cache_PurgeRange hand clears cache lines in address range by writing zero to associative purge addresses
-0x0605af08 func vdp_InitDisplayMode hand initializes display variables per mode 0/1/2, sets buffer pointers and sizes, calls two setup helpers
-0x0605b120 func smpc_UpdatePeriphFrame hand per-frame stream update, counters, swaps three buffers, calls decode callbacks (was audio_UpdateStreamFrame)
-0x0605b328 func smpc_PeriphIntbackHandler hand byte-pair stream decoder state machine, 0xf0 nibble commands, writes strided buffers (was audio_DecodeStreamState)
+0x0605af08 func smpc_InitIntback hand initializes display variables per mode 0/1/2, sets buffer pointers and sizes, calls two setup helpers (bsim audit 10-14: was vdp_InitDisplayMode)
+0x0605b120 func smpc_ReadIntbackResult hand per-frame stream update, counters, swaps three buffers, calls decode callbacks (was audio_UpdateStreamFrame) (bsim audit 10-14: was smpc_UpdatePeriphFrame)
+0x0605b328 func smpc_ParseIntbackData hand byte-pair stream decoder state machine, 0xf0 nibble commands, writes strided buffers (was audio_DecodeStreamState) (bsim audit 10-14: was smpc_PeriphIntbackHandler)
 0x0605b958 func smpc_CheckPeriphLimit hand sets flag when ushort counter reaches int counter (was audio_CheckStreamLimit)
 0x0605b984 func smpc_CheckNextPeriphPending hand sets state 2 when threshold exceeded and status bit 0x20 set (was audio_CheckStreamTimeout)
 0x0605b9b8 func smpc_CopyOregBytes hand copies every second source byte up to limit address into output pointer (was audio_CopyStreamBytes)
@@ -774,7 +774,7 @@
 0x0605bbd4 func smpc_SetPeriphIdByte hand stores byte at offset 0 of strided row buffer (was audio_SetRowByte0)
 0x0605bc00 func smpc_SetPeriphSizeByte hand stores byte at offset 1 of strided row buffer (was audio_SetRowByte1)
 0x0605bc30 func smpc_MergePeriphBuffers hand copies six words to stack, calls handler, calls again if nonzero (was audio_ProcessSixWordRecord)
-0x0605bc98 func smpc_MergePeriphStep hand copies or fills rows between two row buffers with 0xf fill, advances pointers (was audio_BlendRowsStep)
+0x0605bc98 func smpc_CopyDataRows hand copies or fills rows between two row buffers with 0xf fill, advances pointers (was audio_BlendRowsStep) (bsim audit 10-14: was smpc_MergePeriphStep)
 0x0605be58 func snd_LoadSoundDriver hand waits on bit, loads 68000 sound driver into sound RAM, sets table pointers, resets
 0x0605bfe0 func snd_PatchSoundRamValue hand resolves address via helper, copies data, ORs constant into result
 0x0605c02c func snd_SendCmdTwice hand guarded mailbox send of one-byte arg command, waits for ack, repeats
@@ -1153,8 +1153,8 @@
 0x06068e8a func stub_06068e8a hand empty stub only returns
 0x06068e8c func stub_06068e8c hand empty stub only returns
 0x06068f00 func mem_CopyBlocks64 hand unrolled copy of 16-word (64 byte) blocks from source to destination until count exhausted, memcpy tail
-0x06068f4c func math_DivideSigned32 hand unrolled 32-step restoring division using SH-2 div1 pattern, returns quotient of param_1 by param_2
-0x06068fec func math_DivideUnsigned32 hand unrolled 32-step restoring unsigned division using SH-2 div1 pattern, returns quotient of param_1 by param_2
+0x06068f4c func __divsi3 hand unrolled 32-step restoring division using SH-2 div1 pattern, returns quotient of param_1 by param_2 (bsim audit 10-14: was math_DivideSigned32)
+0x06068fec func __udivsi3 hand unrolled 32-step restoring unsigned division using SH-2 div1 pattern, returns quotient of param_1 by param_2 (bsim audit 10-14: was math_DivideUnsigned32)
 0x06069088 func softfp_PackDouble hand packs unpacked float class struct (zero, inf, nan, normal) into IEEE double with rounding, libgcc pack_d
 0x06069240 func softfp_UnpackDouble hand splits IEEE double into class, sign, exponent, mantissa struct; handles zero, denormal, inf, nan, libgcc unpack_d
 0x0606933c func softfp_AddParts hand adds two unpacked doubles aligning exponents, handles inf and zero classes, normalizes result, libgcc fpadd_parts
@@ -1197,7 +1197,7 @@
 0x0606acd8 func softfp_NegFloat hand unpacks single, toggles sign flag, packs result, libgcc negsf2
 0x0606ad0c func softfp_PackFloatFromStackArgs hand stores four args to stack struct and calls softfp pack helper
 0x0606ad30 func softfp_FloatToDouble hand unpacks single, shifts mantissa right 2, packs double, libgcc extendsfdf2
-0x0606ad84 func math_ArithShiftRightSwitch hand arithmetic shift right of param_1 by 0-31 via fallthrough switch, sign fill beyond
+0x0606ad84 func __ashrsi3 hand arithmetic shift right of param_1 by 0-31 via fallthrough switch, sign fill beyond (bsim audit 10-14: was math_ArithShiftRightSwitch)
 0x0606af0c func memcmp hand compares param_3 bytes of two buffers, returns byte difference or zero
 0x0606af3c func strcmp_2 hand compares two NUL-terminated strings, returns byte difference
 0x0606af6c func strncmp hand compares at most param_3 bytes of two strings, stops at NUL, returns difference
